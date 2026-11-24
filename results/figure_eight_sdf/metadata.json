@@ -1,0 +1,38 @@
+{
+  "method": "GaussianSlicer independent",
+  "mode": "sdf_completion",
+  "epochs": 500,
+  "kernels_per_plane": 256,
+  "planes": 15,
+  "resolution": 512,
+  "gs": "Anisotropic learnable planar Gaussians with exact alpha compositing",
+  "deviations": [
+    "Independent implementation; no author code available",
+    "Parallel slices only; single binary label",
+    "Nearest-nine-plane normal-bandwidth extension for alpha3d; explicit completion of unspecified 3D rule",
+    "Linear variant interpolates planar logits and uses Gaussian end caps",
+    "LR halved every 50 epochs, interpreting ambiguous paper steps as epochs",
+    "384 off-contour and 128 boundary samples/plane; boundary occupancy .5",
+    "Geometry neighbors in physical 3D across planes; opacity target recomputed at learned means",
+    "Marching cubes extraction; no mesh smoothing or GT trimming"
+  ],
+  "final": {
+    "epoch": 500,
+    "bce": 0.22479801625013351,
+    "geometry": 0.003399114590138197,
+    "opacity": 0.026312243193387985,
+    "seconds": 56.41182041168213,
+    "lr": 1.953125e-06,
+    "validation_sign_error": 0.0003624869898582498,
+    "validation_bce": 0.06987272736926874
+  },
+  "seconds": 175.2763946056366,
+  "isotropic_initialization": true,
+  "normal_width_multiplier": 1.5,
+  "neighbor_planes": 13,
+  "original_extraction_resolution": 256,
+  "source_trained_run": "results/figure_eight",
+  "completion": "2D Euclidean distance transform of learned Gaussian alpha>=.5 masks; linear signed-distance interpolation; elliptic end caps with height min(component inradius,half slice spacing). Explicit mesh-stage design, not paper equation.",
+  "completion_seconds": 51.24277067184448,
+  "timing_note": "Completion timing is separate from source-model training and is not a speed benchmark."
+}

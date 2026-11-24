@@ -1,0 +1,33 @@
+{
+  "method": "GaussianSlicer independent",
+  "mode": "linear",
+  "epochs": 500,
+  "kernels_per_plane": 192,
+  "planes": 75,
+  "resolution": 512,
+  "gs": "Anisotropic learnable planar Gaussians with exact alpha compositing",
+  "deviations": [
+    "Independent implementation; no author code available",
+    "Parallel slices only; single binary label",
+    "Nearest-nine-plane normal-bandwidth extension for alpha3d; explicit completion of unspecified 3D rule",
+    "Linear variant interpolates planar logits and uses Gaussian end caps",
+    "LR halved every 50 epochs, interpreting ambiguous paper steps as epochs",
+    "384 off-contour and 128 boundary samples/plane; boundary occupancy .5",
+    "Geometry neighbors in physical 3D across planes; opacity target recomputed at learned means",
+    "Marching cubes extraction; no mesh smoothing or GT trimming"
+  ],
+  "final": {
+    "epoch": 500,
+    "bce": 0.2203633040189743,
+    "geometry": 1.0076565623283387,
+    "opacity": 0.049902383238077164,
+    "seconds": 186.9639437198639,
+    "lr": 1.953125e-06,
+    "validation_sign_error": 0.0045538759153957165,
+    "validation_bce": 0.06139836690078179
+  },
+  "seconds": 269.6897933483124,
+  "original_extraction_resolution": 256,
+  "seed": 11,
+  "timing_note": "Original run timing includes 256-cubed extraction; later 512-cubed extraction is not included. Concurrent workload; not a speed benchmark."
+}

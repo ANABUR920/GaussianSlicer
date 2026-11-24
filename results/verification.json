@@ -1,0 +1,36 @@
+{
+  "verification_date": "2026-11-25",
+  "tests": [
+    "Exact alpha value and gradient",
+    "Finite occupancy and input gradients",
+    "Cached extraction vs direct evaluation",
+    "Contour normalization round trip and annular parity",
+    "Duplicate-plane rejection",
+    "CPU synthetic prepare/train/mesh/restore pipeline"
+  ],
+  "local_python": "3.11.9",
+  "local_torch": "2.11.0+cu128",
+  "models": [
+    {
+      "case": "figure_eight",
+      "vertices": 269185,
+      "faces": 538384,
+      "connected_components": 8,
+      "sampled_mesh_occupancy_deviation_mean": 0.0009013350354507565,
+      "mesh_sha256": "e6446ae22de3c5fce63514d532ca6fb266eab44fdbace2e1111ea5fee97c4f19",
+      "checkpoint_load": "passed",
+      "sample_arrays": "passed"
+    },
+    {
+      "case": "coronary",
+      "vertices": 215770,
+      "faces": 429312,
+      "connected_components": 581,
+      "sampled_mesh_occupancy_deviation_mean": 0.01190955564379692,
+      "mesh_sha256": "39b3c68eb64e6fd6024b427f67ea8d831bcef6ce4e905b2c51f793fc4bd9e4c5",
+      "checkpoint_load": "passed",
+      "sample_arrays": "passed"
+    }
+  ],
+  "notes": "Mesh-occupancy deviation is an internal extraction check, not ground-truth accuracy."
+}
