@@ -3,16 +3,12 @@
 
 **ICASSP 2025** · [Paper / DOI](https://doi.org/10.1109/ICASSP49660.2025.10890834) · [BibTeX](CITATION.bib)
 
-[Yuhu Guo](https://anabur920.github.io/)<sup>1,*</sup> ·
-[Chenghao Qian](https://jumponthemoon.github.io/)<sup>2,*</sup> ·
-Yuhong Mo<sup>1</sup> ·
-[Akkarit Sangpetch](https://www.ece.cmu.edu/directory/bios/sangpetch-akkarit.html)<sup>3,4</sup>
+[Yuhu Guo](https://anabur920.github.io/)<sup>*</sup> ·
+[Chenghao Qian](https://jumponthemoon.github.io/)<sup>*</sup> ·
+Yuhong Mo ·
+[Akkarit Sangpetch](https://www.ece.cmu.edu/directory/bios/sangpetch-akkarit.html)
 
-<sup>1</sup> Carnegie Mellon University<br>
-<sup>2</sup> University of Leeds<br>
-<sup>3</sup> CMKL University<br>
-<sup>4</sup> School of Engineering, King Mongkut's Institute of Technology Ladkrabang (KMITL)<br>
-<sup>*</sup> Equal contribution. Affiliations follow the paper.
+<sup>*</sup> Equal contribution.
 
 **Reconstruct surfaces from cross-sectional contours using learnable planar Gaussian kernels.**
 
