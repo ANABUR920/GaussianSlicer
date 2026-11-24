@@ -1,0 +1,126 @@
+{
+  "case": "figure_eight",
+  "selection": "Original 500-epoch checkpoint plus cubic signed-distance interpolation and Gaussian scalar-field smoothing (sigma 0.012).",
+  "controlled_512_grid_comparison_before_degenerate_face_cleanup": [
+    {
+      "variant": "Previous",
+      "input_mean": 0.00037129517020544295,
+      "input_p95": 0.001006588734693778,
+      "chamfer_percent_diagonal": 0.3811918032229762,
+      "components": 8,
+      "largest_euler": -2,
+      "faces": 538384
+    },
+    {
+      "variant": "Smooth completion",
+      "input_mean": 0.0006654697216555919,
+      "input_p95": 0.0017333192364798395,
+      "chamfer_percent_diagonal": 0.124621509128218,
+      "components": 2,
+      "largest_euler": -2,
+      "faces": 518208
+    },
+    {
+      "variant": "Refinement + smooth completion",
+      "input_mean": 0.0006858621425990332,
+      "input_p95": 0.001756682954310631,
+      "chamfer_percent_diagonal": 0.127426611538177,
+      "components": 13,
+      "largest_euler": -2,
+      "faces": 517904
+    }
+  ],
+  "exploratory_mixed_resolution_trials": [
+    {
+      "variant": "Previous",
+      "input_mean": 0.00037129517020544295,
+      "input_p95": 0.001006588734693778,
+      "chamfer_percent_diagonal": 0.3811918032229762,
+      "components": 8,
+      "largest_euler": -2,
+      "faces": 538384,
+      "resolution": 512
+    },
+    {
+      "variant": "Previous + smooth completion",
+      "input_mean": 0.0010812998683480872,
+      "input_p95": 0.0029140290493419345,
+      "chamfer_percent_diagonal": 0.13421621914286483,
+      "components": 1,
+      "largest_euler": -2,
+      "faces": 129316,
+      "resolution": 256
+    },
+    {
+      "variant": "Smooth start + smooth completion",
+      "input_mean": 0.0011147100806327892,
+      "input_p95": 0.002953096995505853,
+      "chamfer_percent_diagonal": 0.21828845397764077,
+      "components": 19,
+      "largest_euler": -2,
+      "faces": 133900,
+      "resolution": 256
+    },
+    {
+      "variant": "Smooth start + stronger smoothing",
+      "input_mean": 0.001635905957912015,
+      "input_p95": 0.0036458323190525855,
+      "chamfer_percent_diagonal": 0.18472966896865958,
+      "components": 2,
+      "largest_euler": -2,
+      "faces": 128592,
+      "resolution": 256
+    }
+  ],
+  "metric_notes": {
+    "surface_samples": 4000,
+    "seed": 11,
+    "input_contour_subsampling": "Every third point (2704 points); final evaluation uses all 8112 points.",
+    "reference_usage": "Post-run evaluation only",
+    "cleanup": "Selected 512 mesh had two zero-area triangles removed; final metrics are in smoothing_evaluation.json."
+  },
+  "training_runs": {
+    "smooth_start": {
+      "epochs": 500,
+      "kernels_per_plane": 256,
+      "seed": 11,
+      "smooth_start": true,
+      "warmup_epochs": 200,
+      "initial_blur": 0.02,
+      "initial_learning_rate": null,
+      "initialized_from_checkpoint": null,
+      "final": {
+        "epoch": 500,
+        "bce": 0.23498428612947464,
+        "geometry": 0.0033790713641792536,
+        "opacity": 0.027941493317484856,
+        "seconds": 16.97172451019287,
+        "lr": 1e-05,
+        "spatial_blur": 0.0,
+        "validation_sign_error": 0.0014279071629668275,
+        "validation_bce": 0.08469342341025671
+      }
+    },
+    "refinement": {
+      "epochs": 500,
+      "kernels_per_plane": 256,
+      "seed": 11,
+      "smooth_start": true,
+      "warmup_epochs": 100,
+      "initial_blur": 0.006,
+      "initial_learning_rate": 0.0001,
+      "initialized_from_checkpoint": "model.pt",
+      "final": {
+        "epoch": 500,
+        "bce": 0.22294529527425766,
+        "geometry": 0.003422353998757899,
+        "opacity": 0.024211893789470196,
+        "seconds": 9.699102640151978,
+        "lr": 1.0000000000000002e-06,
+        "spatial_blur": 0.0,
+        "validation_sign_error": 0.0003624869898582498,
+        "validation_bce": 0.06731100790202618
+      }
+    }
+  }
+}

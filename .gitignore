@@ -8,3 +8,5 @@ prepared/
 reconstruction/
 runs/
 *.tmp
+
+results/*/mesh.obj

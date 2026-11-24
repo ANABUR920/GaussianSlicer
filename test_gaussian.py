@@ -42,3 +42,11 @@ direct = m.occupancy(q, "linear").detach().numpy()
 cached = volume[tuple(ids.T)]
 assert np.allclose(direct, cached, atol=3e-6), np.max(abs(direct - cached))
 print("PASS cached axis-aligned volume equals direct Gaussian evaluation")
+m.spatial_blur = 0.02
+y = m.plane_occupancy(x, torch.ones(len(x), dtype=torch.long))
+assert torch.isfinite(y).all()
+grad = torch.autograd.grad(y.sum(), m.log_scale)[0]
+assert torch.isfinite(grad).all() and grad.abs().sum() > 0
+m.spatial_blur = 0.0
+assert np.allclose(m.occupancy(q, "linear").detach().numpy(), direct, atol=3e-6)
+print("PASS smooth-start blur gradients and exact zero-blur recovery")

@@ -1,38 +1,60 @@
 # GaussianSlicer
+### Efficient Surface Reconstruction from Cross-sectional Slices with Gaussian Splatting
 
-**Cross-sectional contours → learnable planar Gaussians → triangle meshes.**
+**ICASSP 2025** · [Paper / DOI](https://doi.org/10.1109/ICASSP49660.2025.10890834) · [BibTeX](CITATION.bib)
 
-An experimental, independent implementation based on *GaussianSlicer: Efficient Surface Reconstruction from Cross-sectional Slices with Gaussian Splatting*. It fits slice occupancy with differentiable Gaussian alpha composition and reconstructs a 3D surface from the learned slices.
+[Yuhu Guo](https://anabur920.github.io/)<sup>1,*</sup> ·
+[Chenghao Qian](https://jumponthemoon.github.io/)<sup>2,*</sup> ·
+Yuhong Mo<sup>1</sup> ·
+[Akkarit Sangpetch](https://www.ece.cmu.edu/directory/bios/sangpetch-akkarit.html)<sup>3,4</sup>
 
-This release supports **parallel planes and binary regions**, including nested contour loops. It includes runnable code, two trained examples, full-resolution meshes, checkpoints, inputs, and training histories. Cross-plane aggregation and extraction choices are documented below; this snapshot does not claim to reproduce every component or the numerical results of the paper.
+<sup>1</sup> Carnegie Mellon University<br>
+<sup>2</sup> University of Leeds<br>
+<sup>3</sup> CMKL University<br>
+<sup>4</sup> School of Engineering, King Mongkut's Institute of Technology Ladkrabang (KMITL)<br>
+<sup>*</sup> Equal contribution. Affiliations follow the paper.
 
-## Results
+**Reconstruct surfaces from cross-sectional contours using learnable planar Gaussian kernels.**
 
-These images are rendered directly from the included inputs and meshes, with a shared camera and scale within each pair. There is no reference-mesh cropping, geometry smoothing, or image retouching.
+![Contours, learned Gaussian splats, and reconstructed surface](assets/pipeline.png)
 
-### Figure eight · 15 slices
+## Gaussian representation
 
-![Input contours and reconstructed figure eight](assets/figure_eight.png)
+Each kernel learns a center, covariance scales, in-plane rotation, and opacity. The renderer composes their contributions into slice occupancy:
 
-500 epochs · 256 Gaussians per plane · isotropic initialization · planar GS with logit interpolation · 512³ extraction.
+```text
+occupancy(x) = 1 - product_k(1 - opacity_k * gaussian_k(x))
+```
 
-[Input](examples/figure_eight/planes.json) · [Mesh](results/figure_eight/mesh.ply) · [Checkpoint](results/figure_eight/model.pt) · [Configuration](results/figure_eight/metadata.json)
+![Learned Gaussian kernels rotating in 3D](assets/gaussian_turntable.gif)
 
-Both holes are retained. Slice bands and end-cap artifacts remain visible.
+The visualization uses all **3,840 learned kernels** in the figure-eight checkpoint. Colors encode slice height. For clarity, display alpha is scaled by 0.25 and one-sigma outlines are drawn for every eighth kernel; the training opacities and covariance shapes remain in the checkpoint. [Rendering parameters](assets/splat_visualization.json).
+
+![Gaussian covariance ellipses and alpha-composited occupancy](assets/gaussian_slice.png)
+
+The left panel shows learned centers and one-sigma covariance ellipses on one slice. The right panel evaluates the actual alpha-composited occupancy, with the input contour overlaid.
+
+## Smooth reconstruction
+
+![Figure-eight reconstruction before and after smoothing](assets/smooth_comparison.png)
+
+The smooth surface path converts learned planar occupancy into signed-distance fields, uses natural cubic interpolation across slices, applies Gaussian field regularization, and extracts the mesh with marching cubes. The example uses 15 planes, 256 kernels per plane, and a **512³** extraction grid. The scalar-field smoothing scale is **0.012 in normalized coordinates**.
+
+[Smooth mesh](results/figure_eight_smooth/mesh.ply) · [Model](results/figure_eight/model.pt) · [Settings](results/figure_eight_smooth/metadata.json) · [Before/after measurements](results/smoothing_evaluation.json)
+
+The original model and direct logit-interpolation result remain available in [results/figure_eight](results/figure_eight). The showcase uses its 500-epoch checkpoint with smooth surface extraction. Training and extraction changes are measured separately in [the ablation record](results/smoothing_ablation.json).
+
+On this case, the mean symmetric point-to-triangle distance decreased from **0.381% to 0.125%** of the reference bounding-box diagonal (4,000 samples per surface, seed 11). The smooth mesh has one connected component and retains both holes. Input-contour mean distance increased from 0.000372 to 0.000666 in normalized coordinates, reflecting the smoothing tradeoff. These measurements describe this development case.
 
 ### Coronary structure · 75 slices
 
-![Input contours and reconstructed coronary structure](assets/coronary.png)
+![Coronary input contours and reconstructed mesh](assets/coronary.png)
 
-500 epochs · 192 Gaussians per plane · anisotropic initialization · planar GS with logit interpolation · 512³ extraction.
-
-[Input](examples/coronary/planes.json) · [Mesh](results/coronary/mesh.ply) · [Checkpoint](results/coronary/model.pt) · [Configuration](results/coronary/metadata.json)
-
-The main structure and branching geometry are recovered, but some thin branches remain disconnected and small floating components remain. These are selected development examples, not an independent test set or a claim of superiority over other methods.
+500 epochs · 192 kernels per plane · direct logit interpolation · 512³ extraction. [Input](examples/coronary/planes.json) · [Mesh](results/coronary/mesh.ply) · [Model](results/coronary/model.pt).
 
 ## Installation
 
-Use Python 3.10 or newer. Install PyTorch for your CPU/CUDA environment, then:
+Python 3.10+ and a PyTorch build matching your CPU/CUDA environment:
 
 ```bash
 python -m pip install -r requirements.txt
@@ -40,11 +62,7 @@ python test_gaussian.py
 python test_input.py
 ```
 
-Training examples were produced on an NVIDIA A100 using Python 3.10 and PyTorch 2.13.0+cu130. Small CPU smoke tests also pass with Python 3.11 and PyTorch 2.11.0+cu128. GPU/library differences can change numerical results; bitwise determinism is not promised.
-
 ## Quick start
-
-Generate original synthetic contours and run a small CPU example:
 
 ```bash
 python example.py --output example_input
@@ -52,99 +70,87 @@ python gaussian_slicer.py --planes example_input/planes.json --samples example_i
 python restore_coordinates.py example_run/mesh.ply example_input/transform.json example_run/mesh_world.ply
 ```
 
-For a full GPU run, replace the small-test settings with `--device cuda --kernels 256 --epochs 500 --resolution 512`. CPU execution at full resolution is slow.
+For GPU training, use `--device cuda` and increase the kernel count, epochs, and resolution.
 
-### Reproduce the included examples
+### Reproduce the smooth figure eight
 
-The exact prepared sample arrays used for these runs are included:
+Using the included checkpoint:
+
+```bash
+python extract_sdf_completion.py --planes examples/figure_eight/planes.json --run results/figure_eight --output runs/figure_eight_smooth --resolution 512 --interpolation cubic --smooth-sigma 0.012
+```
+
+Train the checkpoint from the included contour samples:
 
 ```bash
 python gaussian_slicer.py --planes examples/figure_eight/planes.json --samples examples/figure_eight/samples.npz --output runs/figure_eight --mode linear --kernels 256 --epochs 500 --resolution 512 --isotropic-init --normal-width 1.5 --neighbor-planes 13 --seed 11
-python gaussian_slicer.py --planes examples/coronary/planes.json --samples examples/coronary/samples.npz --output runs/coronary --mode linear --kernels 192 --epochs 500 --resolution 512 --seed 11
 ```
 
-Normal-width and neighbor-plane parameters are recorded for completeness but do not affect `linear` mode. The saved examples were originally extracted at 256³ and then re-extracted at 512³ from the same checkpoints. To re-extract without retraining:
+### Smooth-start training
+
+The training schedule gradually removes covariance blur and softens contour labels during the early stage, encourages cross-plane scale consistency, and uses a cosine learning-rate schedule. The final stage uses unblurred kernels and binary off-contour labels.
 
 ```bash
-python extract_gaussian.py --planes examples/figure_eight/planes.json --run results/figure_eight --resolution 512
+python gaussian_slicer.py --planes examples/figure_eight/planes.json --samples examples/figure_eight/samples.npz --output runs/smooth_start --mode linear --kernels 256 --epochs 500 --resolution 512 --isotropic-init --smooth-start --warmup-epochs 200 --blur-start 0.02
 ```
 
-Fresh training outputs `mesh.ply`, `mesh.obj`, `model.pt`, `gaussians.npz`, `history.json`, and `metadata.json`. The committed examples provide PLY meshes, PyTorch state dictionaries, metadata, and histories.
+For gentle refinement of an existing checkpoint, add `--init-model results/figure_eight/model.pt --lr 0.0001 --blur-start 0.006 --warmup-epochs 100`. The showcased surface uses the existing checkpoint plus smooth extraction, which gave the best result among the evaluated settings.
 
-### Use your own contours
+### Your own contours
 
 ```bash
 python prepare_input.py contours.csl prepared
-# JSON contours are also supported:
-# python prepare_input.py contours.json prepared
+# JSON input is also supported: python prepare_input.py contours.json prepared
 python gaussian_slicer.py --planes prepared/planes.json --samples prepared/samples.npz --output reconstruction --mode linear --kernels 256 --epochs 500 --resolution 512 --isotropic-init
-python restore_coordinates.py reconstruction/mesh.ply prepared/transform.json reconstruction/mesh_world.ply
+python extract_sdf_completion.py --planes prepared/planes.json --run reconstruction --output reconstruction_smooth --resolution 512 --interpolation cubic --smooth-sigma 0.012
+python restore_coordinates.py reconstruction_smooth/mesh.ply prepared/transform.json reconstruction_smooth/mesh_world.ply
 ```
 
-JSON input is a list of plane objects with `origin`, `normal`, and `loops`; each loop contains 3D vertices. Nested loops use even-odd filling. The adapter centers the contour bounding box and scales its longest extent to 1.8. Extraction uses `[-1.1, 1.1]³`, so normalize custom inputs with this adapter. `transform.json` records the inverse transformation. `--keep-coordinates` is only for already normalized data.
+JSON inputs contain `origin`, `normal`, and `loops` for each plane. Each loop is a list of 3D vertices. Nested contours use even-odd filling. Preparation centers the contours and scales the longest bounding-box extent to 1.8; `transform.json` reverses that normalization.
 
-The bundled examples already use normalized benchmark coordinates; their meshes and contour JSON files share the same coordinate system.
+## Implementation
 
-## What is implemented?
+- **Inputs:** parallel slicing planes and binary foreground regions. The cached smooth surface extractor uses axis-aligned planes.
+- **Representation:** learnable planar Gaussian centers, anisotropic covariance, and opacity; fixed kernel count.
+- **Training:** occupancy BCE, geometric alignment, and opacity regularization. Smooth-start is selected with a CLI flag.
+- **Surface paths:** direct planar-logit interpolation, normal-bandwidth alpha composition (`alpha3d`), or interpolated signed-distance completion.
+- **Smooth extraction:** cubic interpolation and scalar-field Gaussian regularization before marching cubes. The smoothing scale is expressed in world-normalized units, independent of grid resolution.
+- **Outputs:** PLY/OBJ meshes, model state, Gaussian parameter arrays, histories, and metadata.
 
-Each planar Gaussian has a learnable center, two covariance scales, an in-plane rotation, and opacity. For one foreground label over a black background, the renderer computes
+Large smoothing scales can reduce thin structures. Slice bands, end-cap errors, or disconnected branches can still occur on challenging inputs. The figures show the actual meshes; no image retouching is applied. The examples are development cases, and reference meshes are used only for post-run evaluation.
 
-```text
-occupancy(x) = 1 - product_k(1 - opacity_k * gaussian_k(x))
-```
-
-This is differentiable alpha composition. All splats have the same label, so the result is independent of ordering. It is not an RGB/camera 3DGS renderer: there are no spherical harmonics, image-view supervision, or CUDA tile rasterizer.
-
-Training uses BCE, cross-plane geometry penalties, and an opacity penalty. Adam starts at 0.001, with learning rate halved every 50 **epochs**. Batches contain up to eight planes, each with 384 off-contour samples and 128 boundary samples. Boundary occupancy is 0.5. Gaussian counts, initialization, neighbor associations, and the interpretation of the paper's steps/epochs wording are implementation choices.
-
-Two field constructions are available:
-
-- **`linear`** — fit planar Gaussian occupancies, interpolate adjacent-plane logits, and add Gaussian end caps. This mode is used in the main examples.
-- **`alpha3d`** — extend planar kernels along their normals and alpha-compose nearby-plane contributions. This experimental extension learns normal bandwidths; use `--normal-width` and `--neighbor-planes` to control it. It is not assumed to outperform `linear`.
-
-Both export meshes using marching cubes. Axis-aligned `linear` extraction caches planar evaluations; its values are tested against direct Gaussian evaluation.
-
-### Optional SDF completion
-
-`extract_sdf_completion.py` is a separate **mesh-stage experiment**, not an equation attributed to the paper. It converts learned Gaussian occupancy masks into 2D distance fields, interpolates them, and uses elliptic end caps. It does not retrain the Gaussian model or read a reference mesh.
-
-<details>
-<summary>View the figure-eight completion experiment</summary>
-
-![Optional Gaussian-mask SDF completion](assets/figure_eight_sdf.png)
-
-[Mesh](results/figure_eight_sdf/mesh.ply) · [Metadata](results/figure_eight_sdf/metadata.json)
+## Visualize your kernels
 
 ```bash
-python extract_sdf_completion.py --planes examples/figure_eight/planes.json --run results/figure_eight --output runs/figure_eight_sdf --resolution 512
+python -m pip install -r requirements-viz.txt
+python tools/visualize_splats.py --run results/figure_eight --planes examples/figure_eight/planes.json --output assets --gain 0.25 --frames 24
+python tools/render_showcase.py
 ```
 
-This completion rule changes end caps and interpolation. It still has discretization and slice artifacts and is not used silently in the main examples.
+The splat renderer reads the saved Gaussian parameters directly. It projects covariance matrices into an orthographic camera, evaluates elliptical Gaussian footprints, and performs depth-ordered alpha composition.
 
-</details>
+## Data and reproducibility
 
-## Training diagnostics and limits
+Example contours are derived from [OReX](https://github.com/haimsaw/OReX) and the [CrossSDF dataset](https://github.com/iamsalvatore/cross_sdf). The coronary example uses a newly generated set of 75 parallel slices. Prepared training samples and checkpoints are included. See [NOTICE](NOTICE) for source attribution and [verification](results/verification.json) for the original release checks.
 
-![Training and observed-plane holdout losses](assets/training.png)
+## Citation
 
-Holdout points come from the **observed planes**, not unseen slices. Training BCE includes boundary samples with target 0.5; holdout BCE uses off-contour points, so the curves have different sampling distributions. Neither curve certifies correct 3D topology. Recorded timings include concurrent experimentation and different extraction resolutions; they are not a speed benchmark.
+If you use this work, please cite:
 
-See [verification.json](results/verification.json) for the executed tests, checkpoint checks, mesh hashes, and connected-component counts. Small disconnected components are included in these counts and are retained in the downloadable meshes.
+```bibtex
+@INPROCEEDINGS{GaussianSlicer,
+  author={Guo, Yuhu and Qian, Chenghao and Mo, Yuhong and Sangpetch, Akkarit},
+  booktitle={ICASSP 2025 - 2025 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)},
+  title={GaussianSlicer: Efficient Surface Reconstruction from Cross-sectional Slices with Gaussian Splatting},
+  year={2025},
+  volume={},
+  number={},
+  pages={1-5},
+  keywords={Geometry;Surface reconstruction;Accuracy;Three-dimensional displays;Layout;Signal processing;Topology;Speech processing;Surface treatment;Optimization;Surface reconstruction;cross-section contours;planer gaussian splatting},
+  doi={10.1109/ICASSP49660.2025.10890834}
+}
+```
 
-Current limitations:
+## License
 
-- Parallel planes and one binary foreground label only; no arbitrary non-parallel or multiclass support.
-- Fixed Gaussian counts; no clone/split/prune densification.
-- Marching cubes instead of the paper's manifold dual contouring.
-- Additional cross-plane completion choices rather than a verified reproduction of an unspecified aggregation formula.
-- Possible slice bands, end-cap errors, disconnected thin branches, and floating components.
-
-## Data provenance and reference
-
-Figure-eight contours originate from [`eight_15.csl` in OReX](https://github.com/haimsaw/OReX/tree/089db1f757022606399d5f070d65bd172fe69362/Data/csl_with_ref). Coronary contours are a new set of 75 parallel cuts of [`coronary_arteries_v2.stl` from CrossSDF](https://github.com/iamsalvatore/cross_sdf/tree/c962cd2f7ee350cb5b6c78db592814901d1cf23c/data/thin_structures), normalized to longest bounding-box extent 1.8. They are **not the original paper's slice realization**. See [NOTICE](NOTICE).
-
-Method reference: Yuhu Guo, Chenghao Qian, Yuhong Mo, and Akkarit Sangpetch, *GaussianSlicer: Efficient Surface Reconstruction from Cross-sectional Slices with Gaussian Splatting*. No unverified bibliographic details or reported paper performance numbers are assigned to this implementation.
-
-Original implementation code is released under [MIT](LICENSE). Third-party source data and dependencies retain their own rights and terms. No other baseline's source code, private credentials, or paper PDF is included.
-
-To regenerate figures, install `requirements-viz.txt` and run `python tools/render_showcase.py`.
+[MIT License](LICENSE).

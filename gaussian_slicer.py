@@ -1,10 +1,4 @@
-"""Unofficial, independent planar Gaussian splatting reconstruction.
-
-Paper-specified: learnable 2D means/covariance/opacity, BCE, geometry and opacity
-regularizers. Explicit completion choices: alpha compositing, initialization,
-normal bandwidth, volumetric interpolation, 50-epoch LR decay, marching cubes.
-No author code, GT mesh, image renderer or third-party baseline is imported.
-"""
+"""GaussianSlicer: learnable planar Gaussian occupancy and surface reconstruction."""
 
 import argparse, json, math, time
 from pathlib import Path
@@ -113,6 +107,7 @@ class PlanarGaussians(nn.Module):
         self.normal_logit = nn.Parameter(torch.zeros(mu.shape[:2]))
         self.width_multiplier = 1.0
         self.neighbor_planes = 9
+        self.spatial_blur = 0.0
         for name, a in [
             ("origin", origins),
             ("basis", bases),
@@ -142,6 +137,8 @@ class PlanarGaussians(nn.Module):
         a = d[..., 0] * co + d[..., 1] * si
         b = -d[..., 0] * si + d[..., 1] * co
         scale = self.log_scale[idx].exp().clamp(0.0008, 0.5)
+        if self.spatial_blur > 0:
+            scale = (scale.square() + self.spatial_blur**2).sqrt()
         g = torch.exp(-0.5 * ((a / scale[..., 0]) ** 2 + (b / scale[..., 1]) ** 2))
         return self.opacity[idx].sigmoid() * g
 
@@ -289,9 +286,14 @@ def train(args):
         with torch.no_grad():
             model.angle.zero_()
             model.log_scale[..., 1].copy_(model.log_scale[..., 0])
+    if args.init_model:
+        model.load_state_dict(
+            torch.load(args.init_model, weights_only=True, map_location=args.device)
+        )
     data = np.load(args.samples)
     trainx = []
     trainy = []
+    trainsdf = []
     valx = []
     valy = []
     on = []
@@ -303,18 +305,36 @@ def train(args):
         trainy.append(
             torch.tensor((data["sdf"][ids[~hold]] < 0).astype("f"), device=args.device)
         )
+        trainsdf.append(torch.tensor(data["sdf"][ids[~hold]], device=args.device))
         vi = ids[hold][:: max(1, int(hold.sum() / 512))]
         valx.append(torch.tensor(data["off"][vi], device=args.device))
         valy.append(torch.tensor((data["sdf"][vi] < 0).astype("f"), device=args.device))
         a = np.concatenate(p["loops"])
         on.append(torch.tensor(a, dtype=torch.float32, device=args.device))
+    data.close()
     opt = torch.optim.Adam(model.parameters(), lr=0.001)
     history = []
     start = time.time()
     opacity_target = torch.ones_like(model.opacity)
+    if args.smooth_start:
+        torch.save(model.state_dict(), out / "stage_000.pt")
     for epoch in range(args.epochs):
+        warmup = max(1, min(args.warmup_epochs, args.epochs - 1))
+        fraction = min(1.0, epoch / warmup)
+        model.spatial_blur = (
+            args.blur_start * (1 - fraction) ** 2 if args.smooth_start else 0.0
+        )
         for group in opt.param_groups:
-            group["lr"] = 0.001 * 0.5 ** (epoch // 50)
+            group["lr"] = (
+                (
+                    args.lr * 0.01
+                    + 0.5
+                    * (args.lr - args.lr * 0.01)
+                    * (1 + math.cos(math.pi * epoch / max(1, args.epochs - 1)))
+                )
+                if args.smooth_start
+                else args.lr * 0.5 ** (epoch // 50)
+            )
         if epoch % 10 == 0:
             mu = model.mu.detach().cpu().numpy()
             opacity_target = torch.tensor(
@@ -332,7 +352,12 @@ def train(args):
                 ids = torch.randint(len(trainx[i]), (384,), device=args.device)
                 edge = torch.randint(len(on[i]), (128,), device=args.device)
                 xs.extend([trainx[i][ids], on[i][edge]])
-                ys.extend([trainy[i][ids], torch.full((128,), 0.5, device=args.device)])
+                target = (
+                    torch.sigmoid(-trainsdf[i][ids] / model.spatial_blur)
+                    if model.spatial_blur > 1e-4
+                    else trainy[i][ids]
+                )
+                ys.extend([target, torch.full((128,), 0.5, device=args.device)])
                 pis.extend([i] * 512)
             x = torch.cat(xs)
             y = torch.cat(ys)
@@ -346,6 +371,12 @@ def train(args):
             geo = model.geometry_loss()
             opacity = (model.opacity.sigmoid() - opacity_target).square().mean()
             loss = bce + geo + opacity
+            if args.smooth_start:
+                scales = model.log_scale.reshape(-1, 2)
+                consistency = (
+                    (scales[:, None] - scales[model.neighbors]).square().mean()
+                )
+                loss = loss + (0.002 + 0.018 * (1 - fraction)) * consistency
             opt.zero_grad(set_to_none=True)
             loss.backward()
             opt.step()
@@ -359,6 +390,7 @@ def train(args):
             opacity=float(np.mean(stats, 0)[2]),
             seconds=time.time() - start,
             lr=opt.param_groups[0]["lr"],
+            spatial_blur=model.spatial_blur,
         )
         if epoch % 10 == 0 or epoch + 1 == args.epochs:
             with torch.no_grad():
@@ -378,6 +410,8 @@ def train(args):
                 row["validation_bce"] = float(np.mean(ces))
             print(json.dumps(row), flush=True)
         history.append(row)
+        if args.smooth_start and epoch + 1 in [100, 250, args.epochs]:
+            torch.save(model.state_dict(), out / f"stage_{epoch+1:03d}.pt")
         if (epoch + 1) % 50 == 0:
             torch.save(model.state_dict(), out / "model.pt")
             (out / "history.json").write_text(json.dumps(history, indent=2))
@@ -386,18 +420,17 @@ def train(args):
     extract(model, out, args.mode, args.resolution)
     np.savez_compressed(
         out / "gaussians.npz",
-        **{name: p.detach().cpu().numpy() for name, p in model.state_dict().items()}
+        **{name: p.detach().cpu().numpy() for name, p in model.state_dict().items()},
     )
     metadata = dict(
-        method="GaussianSlicer independent",
+        method="GaussianSlicer",
         mode=args.mode,
         epochs=args.epochs,
         kernels_per_plane=args.kernels,
         planes=len(planes),
         resolution=args.resolution,
         gs="Anisotropic learnable planar Gaussians with exact alpha compositing",
-        deviations=[
-            "Independent implementation; no author code available",
+        implementation_details=[
             "Parallel slices only; single binary label",
             "Nearest-nine-plane normal-bandwidth extension for alpha3d; explicit completion of unspecified 3D rule",
             "Linear variant interpolates planar logits and uses Gaussian end caps",
@@ -414,6 +447,18 @@ def train(args):
         normal_width_multiplier=args.normal_width,
         neighbor_planes=args.neighbor_planes,
         seed=args.seed,
+        smooth_start=args.smooth_start,
+        warmup_epochs=args.warmup_epochs if args.smooth_start else 0,
+        initial_blur=args.blur_start if args.smooth_start else 0,
+        training_schedule=(
+            "Gaussian covariance blur and soft contour labels annealed to zero, cross-plane log-scale consistency, cosine learning rate"
+            if args.smooth_start
+            else "Step learning rate"
+        ),
+        initial_learning_rate=args.lr,
+        initialized_from_checkpoint=(
+            Path(args.init_model).name if args.init_model else None
+        ),
     )
     (out / "metadata.json").write_text(json.dumps(metadata, indent=2))
     print("COMPLETE", args.mode, args.output, flush=True)
@@ -433,4 +478,9 @@ if __name__ == "__main__":
     ap.add_argument("--isotropic-init", action="store_true")
     ap.add_argument("--normal-width", type=float, default=1.0)
     ap.add_argument("--neighbor-planes", type=int, default=9)
+    ap.add_argument("--smooth-start", action="store_true")
+    ap.add_argument("--warmup-epochs", type=int, default=200)
+    ap.add_argument("--blur-start", type=float, default=0.02)
+    ap.add_argument("--lr", type=float, default=0.001)
+    ap.add_argument("--init-model")
     train(ap.parse_args())

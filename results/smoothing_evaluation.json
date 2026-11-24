@@ -1,0 +1,37 @@
+{
+  "case": "figure_eight",
+  "resolution": 512,
+  "metric": "Mean of both directed mean point-to-triangle distances, divided by reference bounding-box diagonal, times 100; not squared Chamfer",
+  "samples_per_surface": 4000,
+  "seed": 11,
+  "reference_sha256": "7ed7bfaefa621a14336af36cf7a86b106d7ade0038e0bcd62c1fc9b186f8eefc",
+  "input_contour_points": 8112,
+  "reference_usage": "Post-run evaluation only",
+  "comparison": [
+    {
+      "variant": "direct",
+      "mesh_path": "results/figure_eight/mesh.ply",
+      "mesh_sha256": "e6446ae22de3c5fce63514d532ca6fb266eab44fdbace2e1111ea5fee97c4f19",
+      "chamfer_percent_bbox_diagonal": 0.3811918032229762,
+      "input_mean_distance": 0.00037212930836672854,
+      "input_p95_distance": 0.001010331791092852,
+      "connected_components": 8,
+      "largest_component_euler_number": -2,
+      "vertices": 269185,
+      "faces": 538384
+    },
+    {
+      "variant": "smooth",
+      "mesh_path": "results/figure_eight_smooth/mesh.ply",
+      "mesh_sha256": "a4da5d5b3ab50ca201871bb99e817118ce19d65b93586fabb108c0cd5a1ed5bb",
+      "chamfer_percent_bbox_diagonal": 0.12458969285840334,
+      "input_mean_distance": 0.0006660859110683251,
+      "input_p95_distance": 0.0017296213540737469,
+      "connected_components": 1,
+      "largest_component_euler_number": -2,
+      "vertices": 259101,
+      "faces": 518206
+    }
+  ],
+  "relative_chamfer_reduction": 0.6731574713700619
+}

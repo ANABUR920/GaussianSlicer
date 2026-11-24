@@ -1,0 +1,12 @@
+{
+  "kernels": 3840,
+  "projection": "orthographic",
+  "color": "slice height (display only)",
+  "covariance": "learned planar covariance projected into the image",
+  "alpha": "learned opacity times Gaussian footprint times display_alpha_gain",
+  "display_alpha_gain": 0.25,
+  "support_sigma": 3,
+  "one_sigma_outline_stride": 8,
+  "pixel_covariance_antialias": 0.15,
+  "source_checkpoint_sha256": "ac243df899ec5a601124b773b0fe7f1ba00cdfda1c6a1c08090517db725f8927"
+}

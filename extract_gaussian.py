@@ -30,7 +30,21 @@ if __name__ == "__main__":
         backup = out / f"mesh_{old}.{ext}"
         if p.exists() and not backup.exists():
             shutil.copy2(p, backup)
-    extract(m, out, meta["mode"], a.resolution)
+    if meta["mode"] == "sdf_completion":
+        from extract_sdf_completion import build
+
+        build(
+            planes,
+            out,
+            out,
+            a.resolution,
+            a.device,
+            meta.get("interpolation", "linear"),
+            meta.get("field_smoothing_sigma", 0.0),
+        )
+        meta = json.loads((out / "metadata.json").read_text())
+    else:
+        extract(m, out, meta["mode"], a.resolution)
     meta["original_extraction_resolution"] = old
     meta["resolution"] = a.resolution
     (out / "metadata.json").write_text(json.dumps(meta, indent=2))

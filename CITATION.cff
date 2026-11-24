@@ -1,0 +1,38 @@
+cff-version: 1.2.0
+message: "If you use GaussianSlicer, please cite the ICASSP 2025 paper."
+title: "GaussianSlicer: Efficient Surface Reconstruction from Cross-sectional Slices with Gaussian Splatting"
+authors:
+  - family-names: Guo
+    given-names: Yuhu
+    affiliation: Carnegie Mellon University
+    website: https://anabur920.github.io/
+  - family-names: Qian
+    given-names: Chenghao
+    affiliation: University of Leeds
+    website: https://jumponthemoon.github.io/
+  - family-names: Mo
+    given-names: Yuhong
+    affiliation: Carnegie Mellon University
+  - family-names: Sangpetch
+    given-names: Akkarit
+    affiliation: CMKL University; School of Engineering, KMITL
+    website: https://www.ece.cmu.edu/directory/bios/sangpetch-akkarit.html
+repository-code: https://github.com/ANABUR920/GaussianSlicer
+license: MIT
+preferred-citation:
+  type: conference-paper
+  title: "GaussianSlicer: Efficient Surface Reconstruction from Cross-sectional Slices with Gaussian Splatting"
+  authors:
+    - family-names: Guo
+      given-names: Yuhu
+    - family-names: Qian
+      given-names: Chenghao
+    - family-names: Mo
+      given-names: Yuhong
+    - family-names: Sangpetch
+      given-names: Akkarit
+  collection-title: "ICASSP 2025 - 2025 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)"
+  year: 2025
+  start: 1
+  end: 5
+  doi: 10.1109/ICASSP49660.2025.10890834

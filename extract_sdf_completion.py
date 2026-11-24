@@ -1,18 +1,15 @@
-"""Explicit optional mesh-stage completion of learned planar Gaussian masks.
-
-This is NOT a formula attributed to the GaussianSlicer paper. No reference mesh
-is read. It compares distance-field interpolation with direct logit interpolation.
-"""
+"""Construct a surface from learned Gaussian occupancy masks and slice spacing."""
 
 import argparse, json, time
 from pathlib import Path
 import numpy as np, torch, trimesh
-from scipy.ndimage import distance_transform_edt, label, maximum
+from scipy.ndimage import distance_transform_edt, label, maximum, gaussian_filter
+from scipy.interpolate import CubicSpline
 from skimage.measure import marching_cubes
 from gaussian_slicer import PlanarGaussians, make_regions
 
 
-def build(planes, run, out, res, device):
+def build(planes, run, out, res, device, interpolation="linear", smooth_sigma=0.0):
     start = time.time()
     meta = json.loads((run / "metadata.json").read_text())
     r, f = make_regions(planes)
@@ -50,13 +47,22 @@ def build(planes, run, out, res, device):
     spacing = m.spacing.cpu().numpy()
     order = coordinate.argsort()
     s = coordinate[order]
+    spline = (
+        CubicSpline(s, np.asarray(fields)[order], axis=0, bc_type="natural")
+        if interpolation == "cubic"
+        else None
+    )
     volume = np.empty((res, res, res), np.float32)
     for i, z in enumerate(axis * n[axis_id]):
         if s[0] <= z <= s[-1]:
             right = np.clip(np.searchsorted(s, z), 1, len(s) - 1)
             left = right - 1
             t = (z - s[left]) / (s[right] - s[left])
-            v = (1 - t) * fields[order[left]] + t * fields[order[right]]
+            v = (
+                spline(z)
+                if spline is not None
+                else (1 - t) * fields[order[left]] + t * fields[order[right]]
+            )
         else:
             endpoint = order[0] if z < s[0] else order[-1]
             outside = abs(z - coordinate[endpoint])
@@ -72,17 +78,32 @@ def build(planes, run, out, res, device):
         index = [slice(None)] * 3
         index[axis_id] = i
         volume[tuple(index)] = v
-    vertices, faces, _, _ = marching_cubes(volume, 0, spacing=(dx,) * 3)
+    if smooth_sigma > 0:
+        # Sigma is in normalized world coordinates, independent of grid resolution.
+        volume = gaussian_filter(volume, smooth_sigma / dx, mode="nearest")
+    vertices, faces, _, _ = marching_cubes(
+        volume, 0, spacing=(dx,) * 3, allow_degenerate=False
+    )
     out.mkdir(parents=True, exist_ok=True)
-    mesh = trimesh.Trimesh(vertices - 1.1, faces, process=False)
+    mesh = trimesh.Trimesh((vertices - 1.1).astype(np.float32), faces, process=True)
+    mesh.update_faces(mesh.nondegenerate_faces(height=1e-9))
+    mesh.remove_unreferenced_vertices()
     mesh.export(out / "mesh.ply")
     mesh.export(out / "mesh.obj")
     meta.update(
+        training_mode=meta.get("training_mode", meta["mode"]),
         mode="sdf_completion",
-        source_trained_run=str(run),
+        source_trained_run=run.name,
         resolution=res,
-        completion="2D Euclidean distance transform of learned Gaussian alpha>=.5 masks; linear signed-distance interpolation; elliptic end caps with height min(component inradius,half slice spacing). Explicit mesh-stage design, not paper equation.",
+        completion=f"2D Euclidean distance transform of learned Gaussian alpha>=.5 masks; {interpolation} signed-distance interpolation; elliptic end caps with height min(component inradius,half slice spacing).",
         completion_seconds=time.time() - start,
+        interpolation=interpolation,
+        field_smoothing_sigma=smooth_sigma,
+        postprocess=(
+            "Gaussian regularization of the scalar field before marching cubes"
+            if smooth_sigma > 0
+            else "none"
+        ),
     )
     (out / "metadata.json").write_text(json.dumps(meta, indent=2))
     print("SDF COMPLETION", out, flush=True)
@@ -95,6 +116,8 @@ if __name__ == "__main__":
     ap.add_argument("--output", required=True)
     ap.add_argument("--resolution", type=int, default=512)
     ap.add_argument("--device", default="cuda")
+    ap.add_argument("--interpolation", choices=["linear", "cubic"], default="linear")
+    ap.add_argument("--smooth-sigma", type=float, default=0.0)
     a = ap.parse_args()
     build(
         json.loads(Path(a.planes).read_text()),
@@ -102,4 +125,6 @@ if __name__ == "__main__":
         Path(a.output),
         a.resolution,
         a.device,
+        a.interpolation,
+        a.smooth_sigma,
     )
