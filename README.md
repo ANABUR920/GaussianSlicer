@@ -26,32 +26,6 @@ Each kernel learns a center, covariance scales, in-plane rotation, and opacity. 
 occupancy(x) = 1 - product_k(1 - opacity_k * gaussian_k(x))
 ```
 
-![Learned Gaussian kernels rotating in 3D](assets/gaussian_turntable.gif)
-
-The visualization uses all **3,840 learned kernels** in the figure-eight checkpoint. Colors encode slice height. For clarity, display alpha is scaled by 0.25 and one-sigma outlines are drawn for every eighth kernel; the training opacities and covariance shapes remain in the checkpoint. [Rendering parameters](assets/splat_visualization.json).
-
-![Gaussian covariance ellipses and alpha-composited occupancy](assets/gaussian_slice.png)
-
-The left panel shows learned centers and one-sigma covariance ellipses on one slice. The right panel evaluates the actual alpha-composited occupancy, with the input contour overlaid.
-
-## Smooth reconstruction
-
-![Figure-eight reconstruction before and after smoothing](assets/smooth_comparison.png)
-
-The smooth surface path converts learned planar occupancy into signed-distance fields, uses natural cubic interpolation across slices, applies Gaussian field regularization, and extracts the mesh with marching cubes. The example uses 15 planes, 256 kernels per plane, and a **512³** extraction grid. The scalar-field smoothing scale is **0.012 in normalized coordinates**.
-
-[Smooth mesh](results/figure_eight_smooth/mesh.ply) · [Model](results/figure_eight/model.pt) · [Settings](results/figure_eight_smooth/metadata.json) · [Before/after measurements](results/smoothing_evaluation.json)
-
-The original model and direct logit-interpolation result remain available in [results/figure_eight](results/figure_eight). The showcase uses its 500-epoch checkpoint with smooth surface extraction. Training and extraction changes are measured separately in [the ablation record](results/smoothing_ablation.json).
-
-On this case, the mean symmetric point-to-triangle distance decreased from **0.381% to 0.125%** of the reference bounding-box diagonal (4,000 samples per surface, seed 11). The smooth mesh has one connected component and retains both holes. Input-contour mean distance increased from 0.000372 to 0.000666 in normalized coordinates, reflecting the smoothing tradeoff. These measurements describe this development case.
-
-### Coronary structure · 75 slices
-
-![Coronary input contours and reconstructed mesh](assets/coronary.png)
-
-500 epochs · 192 kernels per plane · direct logit interpolation · 512³ extraction. [Input](examples/coronary/planes.json) · [Mesh](results/coronary/mesh.ply) · [Model](results/coronary/model.pt).
-
 ## Installation
 
 Python 3.10+ and a PyTorch build matching your CPU/CUDA environment:
