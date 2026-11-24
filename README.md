@@ -22,6 +22,8 @@ Each kernel learns a center, covariance scales, in-plane rotation, and opacity. 
 occupancy(x) = 1 - product_k(1 - opacity_k * gaussian_k(x))
 ```
 
+![Gaussian covariance ellipses and alpha-composited slice occupancy](assets/gaussian_slice.png)
+
 ## Installation
 
 Python 3.10+ and a PyTorch build matching your CPU/CUDA environment:
